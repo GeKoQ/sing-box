@@ -28,10 +28,6 @@ on:
           - tvOS
           - macOS-standalone
           - publish-android
-      macos_project_version:
-        description: "macOS project version"
-        required: false
-        type: string
   push:
     branches:
       - main-next
@@ -372,7 +368,7 @@ jobs:
           go-version: ^1.23
       - name: Setup Xcode
         run: |-
-          sudo xcode-select -s /Applications/Xcode_16.2_beta_3.app
+          sudo xcode-select -s /Applications/Xcode_16.2.app
       - name: Set tag
         run: |-
           git tag v${{ needs.calculate_version.outputs.version }}
@@ -435,7 +431,7 @@ jobs:
       - name: Setup Xcode
         if: matrix.if
         run: |-
-          sudo xcode-select -s /Applications/Xcode_16.2_beta_3.app
+          sudo xcode-select -s /Applications/Xcode_16.2.app
       - name: Set tag
         if: matrix.if
         run: |-
@@ -492,6 +488,16 @@ jobs:
         with:
           name: library-apple
           path: clients/apple/Libbox.xcframework
+      - name: Update macOS version
+        if: matrix.if && matrix.name == 'macOS'
+        run: |-
+          MACOS_PROJECT_VERSION=$(go run -v ./cmd/internal/app_store_connect next_macos_project_version)
+          echo "MACOS_PROJECT_VERSION=$MACOS_PROJECT_VERSION"
+          echo "MACOS_PROJECT_VERSION=$MACOS_PROJECT_VERSION" >> "$GITHUB_ENV"
+        env:
+          ASC_KEY_PATH: $RUNNER_TEMP/Key.p12
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_ISSUER_ID: ${{ secrets.ASC_KEY_ISSUER_ID }}
       - name: Build
         if: matrix.if
         run: |-
@@ -503,11 +509,11 @@ jobs:
             -destination "${{ matrix.destination }}" \
             -archivePath "${{ matrix.archive }}" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath $RUNNER_TEMP/Key.p12 \
+            -authenticationKeyPath $ASC_KEY_PATH \
             -authenticationKeyID $ASC_KEY_ID \
             -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
         env:
-          MACOS_PROJECT_VERSION: ${{ inputs.macos_project_version }}
+          ASC_KEY_PATH: $RUNNER_TEMP/Key.p12
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_KEY_ISSUER_ID: ${{ secrets.ASC_KEY_ISSUER_ID }}
       - name: Upload to App Store Connect
@@ -518,10 +524,11 @@ jobs:
             -archivePath "${{ matrix.archive }}" \
             -exportOptionsPlist ${{ matrix.upload }} \
             -allowProvisioningUpdates \
-            -authenticationKeyPath $RUNNER_TEMP/Key.p12 \
+            -authenticationKeyPath $ASC_KEY_PATH \
             -authenticationKeyID $ASC_KEY_ID \
             -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
         env:
+          ASC_KEY_PATH: $RUNNER_TEMP/Key.p12
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_KEY_ISSUER_ID: ${{ secrets.ASC_KEY_ISSUER_ID }}
       - name: Build image
